@@ -1,4 +1,4 @@
-module github.com/yurishevtsov/hoard
+module github.com/yur1-ai/hoard
 
 go 1.25.0
 

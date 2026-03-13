@@ -6,10 +6,10 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/yurishevtsov/hoard/internal/app"
-	"github.com/yurishevtsov/hoard/internal/config"
-	"github.com/yurishevtsov/hoard/internal/logger"
-	"github.com/yurishevtsov/hoard/internal/store"
+	"github.com/yur1-ai/hoard/internal/app"
+	"github.com/yur1-ai/hoard/internal/config"
+	"github.com/yur1-ai/hoard/internal/logger"
+	"github.com/yur1-ai/hoard/internal/store"
 )
 
 var version = "dev"

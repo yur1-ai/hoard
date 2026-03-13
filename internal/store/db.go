@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yurishevtsov/hoard/migrations"
+	"github.com/yur1-ai/hoard/migrations"
 	_ "modernc.org/sqlite"
 )
 

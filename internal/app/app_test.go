@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/yurishevtsov/hoard/internal/config"
+	"github.com/yur1-ai/hoard/internal/config"
 )
 
 func newTestApp() App {
