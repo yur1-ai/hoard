@@ -1,0 +1,37 @@
+# ~/.config/hoard/config.toml
+
+base_currency = "USD"
+theme = "dark"                # "dark" | "light" | "auto" | "ascii"
+sidebar_default = "open"      # "open" | "closed"
+
+[market]
+stock_provider = "finnhub"
+crypto_provider = "coingecko"
+refresh_interval_market = "30s"
+refresh_interval_crypto = "120s"
+refresh_interval_closed = "5m"
+
+[market.finnhub]
+api_key = ""  # env: HOARD_FINNHUB_KEY (free at finnhub.io)
+
+[market.coingecko]
+api_key = ""  # env: HOARD_COINGECKO_KEY (free at coingecko.com/en/api/pricing)
+
+[calendar]
+source = "auto"  # "auto" | "gws" | "google-api" | "ics" | "calcom"
+ics_path = ""     # only if source = "ics"
+
+[ai]
+provider_priority = ["ollama", "groq", "gemini"]
+timeout_ms = 5000
+cache_ttl_minutes = 60
+
+[ai.ollama]
+endpoint = "http://localhost:11434"
+model = "llama3.3"
+
+[ai.groq]
+api_key = ""  # env: HOARD_GROQ_KEY
+
+[ai.gemini]
+api_key = ""  # env: HOARD_GEMINI_KEY
