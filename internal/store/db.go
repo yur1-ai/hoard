@@ -25,13 +25,13 @@ func Open(dsn string) (*sql.DB, error) {
 	}
 	for _, p := range pragmas {
 		if _, err := db.Exec(p); err != nil {
-			db.Close()
+			_ = db.Close()
 			return nil, fmt.Errorf("pragma %s: %w", p, err)
 		}
 	}
 
 	if err := RunMigrations(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrations: %w", err)
 	}
 

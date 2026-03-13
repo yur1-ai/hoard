@@ -44,7 +44,6 @@ type App struct {
 	focus       focusArea
 	sidebarOpen bool
 
-	lastErr string
 }
 
 func New(cfg config.Config, db *sql.DB) App {
@@ -89,12 +88,13 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activeView = viewNews
 			case "tab":
 				// Three-state sidebar toggle (v3 fix)
-				if !m.sidebarOpen {
+				switch {
+				case !m.sidebarOpen:
 					m.sidebarOpen = true
 					m.focus = focusSidebar
-				} else if m.focus == focusMarket {
+				case m.focus == focusMarket:
 					m.focus = focusSidebar
-				} else {
+				default:
 					m.sidebarOpen = false
 					m.focus = focusMarket
 				}

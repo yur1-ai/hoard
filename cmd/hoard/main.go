@@ -42,13 +42,17 @@ func main() {
 		return
 	}
 
-	// Init logger first (needs debug flag)
-	if err := logger.Init(config.LogFilePath(), flagDebug); err != nil {
-		fmt.Fprintf(os.Stderr, "logger error: %v\n", err)
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+}
 
-	// Load config (respect --config flag)
+func run() error {
+	if err := logger.Init(config.LogFilePath(), flagDebug); err != nil {
+		return fmt.Errorf("logger: %w", err)
+	}
+
 	var cfg config.Config
 	var err error
 	if flagConfig != "" {
@@ -57,8 +61,7 @@ func main() {
 		cfg, err = config.Load()
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "config error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("config: %w", err)
 	}
 
 	if flagASCII {
@@ -66,28 +69,25 @@ func main() {
 	}
 
 	if err := cfg.Validate(); err != nil {
-		fmt.Fprintf(os.Stderr, "config validation: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("config validation: %w", err)
 	}
 
 	if err := config.EnsureDirs(); err != nil {
-		fmt.Fprintf(os.Stderr, "dir error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("dirs: %w", err)
 	}
 
 	db, err := store.Open(config.DBFilePath())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "db error: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("db: %w", err)
 	}
 	defer db.Close()
 
 	model := app.New(cfg, db)
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 // runImport handles: hoard import <format> <file>
