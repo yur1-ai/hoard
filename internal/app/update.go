@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
 	"github.com/yur1-ai/hoard/internal/store"
+	"github.com/yur1-ai/hoard/internal/ui/market/portfolio"
 )
 
 func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -41,8 +42,24 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastErr = msg.Error()
 		return m, nil
 
+	case portfolio.AddHoldingMsg:
+		return m.handleAddHolding(msg)
+
+	case portfolio.CancelFormMsg:
+		m.portfolio.HideForm()
+		m.mode = modeNormal
+		return m, nil
+
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
+
+	default:
+		// Forward unhandled messages (e.g. textinput cursor blink) when form is active
+		if m.mode == modeTextInput {
+			var cmd tea.Cmd
+			m.portfolio, cmd = m.portfolio.Update(msg)
+			return m, cmd
+		}
 	}
 	return m, nil
 }
@@ -134,25 +151,27 @@ func (m App) updateHeaderFromPortfolio() App {
 }
 
 func (m App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	// Escape always resets to normal mode and closes overlays
-	if key.Matches(msg, m.keys.Escape) {
-		m.mode = modeNormal
-		m.showHelp = false
-		m.lastErr = ""
-		return m, nil
-	}
-
 	// Help overlay: only ? and Esc work while showing
 	if m.showHelp {
-		if key.Matches(msg, m.keys.Help) {
+		if key.Matches(msg, m.keys.Help) || key.Matches(msg, m.keys.Escape) {
 			m.showHelp = false
 		}
 		return m, nil
 	}
 
-	// In text input or search mode, don't process global keys
-	if m.mode != modeNormal {
+	// Escape always resets to normal mode and closes overlays
+	if key.Matches(msg, m.keys.Escape) {
+		m.portfolio.HideForm()
+		m.mode = modeNormal
+		m.lastErr = ""
 		return m, nil
+	}
+
+	// In text input mode, forward all non-Esc keys to the active sub-model
+	if m.mode == modeTextInput {
+		var cmd tea.Cmd
+		m.portfolio, cmd = m.portfolio.Update(msg)
+		return m, cmd
 	}
 
 	// Global keys (normal mode)
@@ -175,16 +194,101 @@ func (m App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Tab):
 		m = m.toggleSidebar()
 
+	case key.Matches(msg, m.keys.Add):
+		if m.activeView == viewPortfolio {
+			cmd := m.portfolio.ShowForm()
+			m.mode = modeTextInput
+			return m, cmd
+		}
+
+	case key.Matches(msg, m.keys.Delete):
+		if m.activeView == viewPortfolio {
+			return m.handleDeleteHolding()
+		}
+
+	case key.Matches(msg, m.keys.Refresh):
+		m.refresh.Reset("equity")
+		m.refresh.Reset("crypto")
+		return m.handleTick()
+
 	default:
-		// Route to focused area
+		// Route to focused area for navigation keys (j/k/up/down)
 		if m.focus == focusSidebar {
 			var cmd tea.Cmd
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd
 		}
+		if m.activeView == viewPortfolio {
+			var cmd tea.Cmd
+			m.portfolio, cmd = m.portfolio.Update(msg)
+			return m, cmd
+		}
 	}
 
 	return m, nil
+}
+
+func (m App) handleAddHolding(msg portfolio.AddHoldingMsg) (tea.Model, tea.Cmd) {
+	m.portfolio.HideForm()
+	m.mode = modeNormal
+
+	if m.db == nil {
+		return m, nil
+	}
+
+	// Get default account (first available)
+	accounts, err := store.ListAccounts(m.db)
+	if err != nil || len(accounts) == 0 {
+		m.lastErr = "no account available"
+		return m, nil
+	}
+
+	// Record buy transaction (auto-creates/updates holding via applyBuy)
+	_, err = store.AddTransaction(m.db, store.Transaction{
+		AccountID: accounts[0].ID,
+		Symbol:    msg.Symbol,
+		Market:    msg.Market,
+		Type:      "buy",
+		Quantity:  msg.Quantity,
+		Price:     msg.AvgCost,
+		Date:      time.Now(),
+	})
+	if err != nil {
+		m.lastErr = fmt.Sprintf("add position: %v", err)
+		return m, nil
+	}
+
+	return m.reloadHoldings()
+}
+
+func (m App) handleDeleteHolding() (tea.Model, tea.Cmd) {
+	if m.db == nil {
+		return m, nil
+	}
+	h := m.portfolio.SelectedHolding()
+	if h == nil {
+		return m, nil
+	}
+	if err := store.DeleteHolding(m.db, h.ID); err != nil {
+		m.lastErr = fmt.Sprintf("delete: %v", err)
+		return m, nil
+	}
+	return m.reloadHoldings()
+}
+
+func (m App) reloadHoldings() (tea.Model, tea.Cmd) {
+	holdings, err := store.ListHoldings(m.db, 0)
+	if err != nil {
+		m.lastErr = fmt.Sprintf("reload: %v", err)
+		return m, nil
+	}
+	m.portfolio.SetHoldings(holdings)
+	m = m.updateHeaderFromPortfolio()
+
+	// Trigger immediate refresh to fetch prices for any new symbols
+	m.refresh.Reset("equity")
+	m.refresh.Reset("crypto")
+	return m.handleTick()
 }
 
 func (m App) toggleSidebar() App {

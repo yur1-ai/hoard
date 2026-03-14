@@ -31,6 +31,8 @@ type Model struct {
 	dayChange     float64
 	dayChangePct  float64
 	table         table.Model
+	showForm      bool
+	form          addForm
 }
 
 func New() Model {
@@ -40,9 +42,45 @@ func New() Model {
 func (m Model) Init() tea.Cmd { return nil }
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+	if m.showForm {
+		var cmd tea.Cmd
+		m.form, cmd = m.form.Update(msg)
+		return m, cmd
+	}
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// ShowForm opens the add-position form overlay and returns a cursor blink cmd.
+func (m *Model) ShowForm() tea.Cmd {
+	var cmd tea.Cmd
+	m.form, cmd = newAddForm(m.width)
+	m.showForm = true
+	return cmd
+}
+
+// HideForm closes the add-position form overlay.
+func (m *Model) HideForm() {
+	m.showForm = false
+}
+
+// IsShowingForm returns whether the form overlay is active.
+func (m Model) IsShowingForm() bool {
+	return m.showForm
+}
+
+// SelectedHolding returns the holding at the current table cursor, or nil if empty.
+func (m Model) SelectedHolding() *store.Holding {
+	if len(m.holdings) == 0 {
+		return nil
+	}
+	idx := m.table.Cursor()
+	if idx < 0 || idx >= len(m.holdings) {
+		return nil
+	}
+	h := m.holdings[idx].holding
+	return &h
 }
 
 // SetHoldings replaces the current holdings list and recalculates derived values.
@@ -162,6 +200,10 @@ func (m *Model) rebuildTable() {
 }
 
 func (m Model) View() string {
+	if m.showForm {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.form.View())
+	}
+
 	if len(m.holdings) == 0 {
 		content := lipgloss.NewStyle().
 			Foreground(common.ColorMuted).

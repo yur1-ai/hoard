@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/yur1-ai/hoard/internal/config"
@@ -257,5 +258,107 @@ func TestErrMsgNilErr(t *testing.T) {
 	got := msg.Error()
 	if got != "some context" {
 		t.Errorf("expected 'some context', got %q", got)
+	}
+}
+
+func TestAddKeyOpensForm(t *testing.T) {
+	m := newTestApp()
+	m.activeView = viewPortfolio
+
+	// Size portfolio so form can render
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(App)
+
+	m = pressKey(m, "a")
+	if m.mode != modeTextInput {
+		t.Error("expected modeTextInput after [a]")
+	}
+	if !m.portfolio.IsShowingForm() {
+		t.Error("expected form to be visible")
+	}
+}
+
+func TestAddKeyOnlyWorksInPortfolioView(t *testing.T) {
+	m := newTestApp()
+	m.activeView = viewWatchlist
+
+	m = pressKey(m, "a")
+	if m.mode != modeNormal {
+		t.Error("expected mode to stay normal when not in portfolio view")
+	}
+}
+
+func TestEscClosesFormAndResetsMode(t *testing.T) {
+	m := newTestApp()
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(App)
+
+	m = pressKey(m, "a") // open form
+	if m.mode != modeTextInput {
+		t.Fatal("setup: expected modeTextInput")
+	}
+
+	m = pressKey(m, "esc") // close form
+	if m.mode != modeNormal {
+		t.Error("expected modeNormal after Esc")
+	}
+	if m.portfolio.IsShowingForm() {
+		t.Error("expected form hidden after Esc")
+	}
+}
+
+func TestDeleteKeyWithNoHoldings(t *testing.T) {
+	m := newTestApp()
+	m.activeView = viewPortfolio
+
+	// Should not panic with empty portfolio and nil db
+	m = pressKey(m, "d")
+	if m.mode != modeNormal {
+		t.Error("mode should stay normal")
+	}
+}
+
+func TestRefreshKeyResetsTracker(t *testing.T) {
+	m := newTestApp()
+	m.refresh.MarkRefreshed("equity")
+	m.refresh.MarkRefreshed("crypto")
+
+	if m.refresh.NeedsRefresh("equity", 5*time.Minute) {
+		t.Fatal("setup: equity should not need refresh")
+	}
+
+	m = pressKey(m, "r")
+	if !m.refresh.NeedsRefresh("equity", 5*time.Minute) {
+		t.Error("expected equity to need refresh after [r]")
+	}
+	if !m.refresh.NeedsRefresh("crypto", 5*time.Minute) {
+		t.Error("expected crypto to need refresh after [r]")
+	}
+}
+
+func TestKeysBlockedDuringForm(t *testing.T) {
+	m := newTestApp()
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(App)
+
+	m = pressKey(m, "a") // open form
+	if m.mode != modeTextInput {
+		t.Fatal("setup: expected modeTextInput")
+	}
+
+	// View switch keys should be blocked
+	m = pressKey(m, "2")
+	if m.activeView != viewPortfolio {
+		t.Error("view should not change while form is open")
+	}
+
+	// Quit should be blocked
+	_, cmd := m.Update(tea.KeyPressMsg(tea.Key{Code: rune('q'), Text: "q"}))
+	if cmd != nil {
+		// cmd might be non-nil due to textinput handling, but should not be QuitMsg
+		msg := cmd()
+		if _, isQuit := msg.(tea.QuitMsg); isQuit {
+			t.Error("q should not quit while form is open")
+		}
 	}
 }

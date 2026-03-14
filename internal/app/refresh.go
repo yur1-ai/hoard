@@ -21,3 +21,8 @@ func (r *refreshTracker) NeedsRefresh(key string, maxAge time.Duration) bool {
 func (r *refreshTracker) MarkRefreshed(key string) {
 	r.lastRefresh[key] = time.Now()
 }
+
+// Reset clears the last-refresh timestamp for key, forcing the next NeedsRefresh to return true.
+func (r *refreshTracker) Reset(key string) {
+	delete(r.lastRefresh, key)
+}
