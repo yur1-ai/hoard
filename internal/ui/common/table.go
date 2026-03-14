@@ -30,12 +30,13 @@ func NewStyledTable(columns []table.Column, rows []table.Row, height int) table.
 
 // FormatMoney returns a colored money string.
 func FormatMoney(value float64) string {
-	s := fmt.Sprintf("$%.2f", value)
 	if value < 0 {
-		s = fmt.Sprintf("-$%.2f", -value)
-		return LossStyle.Render(s)
+		return LossStyle.Render(fmt.Sprintf("-$%.2f", -value))
 	}
-	return s
+	if value > 0 {
+		return GainStyle.Render(fmt.Sprintf("$%.2f", value))
+	}
+	return fmt.Sprintf("$%.2f", value)
 }
 
 // FormatPercent returns a colored percentage string.

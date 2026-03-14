@@ -3,12 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/yur1-ai/hoard/internal/app"
 	"github.com/yur1-ai/hoard/internal/config"
 	"github.com/yur1-ai/hoard/internal/logger"
+	"github.com/yur1-ai/hoard/internal/service/currency"
+	svcmarket "github.com/yur1-ai/hoard/internal/service/market"
 	"github.com/yur1-ai/hoard/internal/store"
 )
 
@@ -82,7 +86,44 @@ func run() error {
 	}
 	defer db.Close()
 
+	// Auto-create default account on first run
+	accounts, err := store.ListAccounts(db)
+	if err != nil {
+		return fmt.Errorf("list accounts: %w", err)
+	}
+	if len(accounts) == 0 {
+		if _, err := store.CreateAccount(db, "Default", "brokerage", cfg.BaseCurrency); err != nil {
+			return fmt.Errorf("create default account: %w", err)
+		}
+		slog.Info("created default account")
+	}
+
+	// Initialize market services
+	stockTTL, _ := time.ParseDuration(cfg.Market.RefreshIntervalMarket)
+	cryptoTTL, _ := time.ParseDuration(cfg.Market.RefreshIntervalCrypto)
+
+	var stockProvider svcmarket.StockProvider
+	if cfg.Market.Finnhub.APIKey != "" {
+		stockProvider = svcmarket.NewFinnhubClient(cfg.Market.Finnhub.APIKey, nil)
+	}
+
+	var cryptoProvider svcmarket.CryptoProvider = svcmarket.NewCoinGeckoClient(cfg.Market.CoinGecko.APIKey, nil)
+
+	marketSvc := svcmarket.NewCachedService(stockProvider, cryptoProvider, db, stockTTL, cryptoTTL)
+	currSvc := currency.NewFrankfurterClient(nil)
+
 	model := app.New(cfg, db)
+	model.SetMarketService(marketSvc)
+	model.SetCurrencyService(currSvc)
+
+	// Load holdings into portfolio view
+	holdings, err := store.ListHoldings(db, 0) // all accounts
+	if err != nil {
+		slog.Warn("failed to load holdings", "error", err)
+	} else {
+		model.SetHoldings(holdings)
+	}
+
 	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
 		return err

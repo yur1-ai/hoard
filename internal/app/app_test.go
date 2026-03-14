@@ -22,7 +22,7 @@ func keyCode(key string) rune {
 	switch key {
 	case "tab":
 		return tea.KeyTab
-	case "escape":
+	case "esc":
 		return tea.KeyEscape
 	default:
 		if len(key) == 1 {
@@ -125,7 +125,7 @@ func TestEscapeReturnsToNormalMode(t *testing.T) {
 	m := newTestApp()
 	m.mode = modeTextInput
 
-	m = pressKey(m, "escape")
+	m = pressKey(m, "esc")
 	if m.mode != modeNormal {
 		t.Errorf("expected modeNormal, got %d", m.mode)
 	}
@@ -177,7 +177,7 @@ func TestEscapeClosesHelp(t *testing.T) {
 	m := newTestApp()
 	m.showHelp = true
 
-	m = pressKey(m, "escape")
+	m = pressKey(m, "esc")
 	if m.showHelp {
 		t.Error("escape should close help")
 	}
@@ -218,5 +218,44 @@ func TestQuitBlockedInTextInput(t *testing.T) {
 	_, cmd := m.Update(tea.KeyPressMsg(tea.Key{Code: rune('q'), Text: "q"}))
 	if cmd != nil {
 		t.Error("q should not quit in text input mode")
+	}
+}
+
+func TestNarrowTerminalWithSidebar(t *testing.T) {
+	m := newTestApp()
+	m.sidebarOpen = true
+	m.focus = focusSidebar
+
+	// Terminal narrower than sidebar width — marketWidth should clamp to 0
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 20, Height: 30})
+	m = updated.(App)
+
+	// Should not panic; market views should have width >= 0
+	v := m.View()
+	if v.Content == "" {
+		t.Error("expected non-empty view even with narrow terminal")
+	}
+}
+
+func TestPropagateSizeAfterResize(t *testing.T) {
+	m := newTestApp()
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(App)
+
+	if m.width != 120 {
+		t.Errorf("expected width=120, got %d", m.width)
+	}
+	if m.height != 40 {
+		t.Errorf("expected height=40, got %d", m.height)
+	}
+}
+
+func TestErrMsgNilErr(t *testing.T) {
+	// ErrMsg with nil Err should not panic
+	msg := ErrMsg{Context: "some context"}
+	got := msg.Error()
+	if got != "some context" {
+		t.Errorf("expected 'some context', got %q", got)
 	}
 }

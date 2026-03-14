@@ -50,9 +50,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	panelHeight := (m.Height - 2) / 3 // divide among 3 panels, minus borders
-	if panelHeight < 3 {
-		panelHeight = 3
+	// 3 panels × 2 border rows = 6, plus 2 newline separators between panels = 8 total
+	panelHeight := (m.Height - 8) / 3
+	if panelHeight < 1 {
+		panelHeight = 1
 	}
 
 	panels := []struct {
