@@ -18,6 +18,9 @@ linters:
     errcheck:
       exclude-functions:
         - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Stmt).Close
+        - (*database/sql.Tx).Rollback
         - (io.Closer).Close
 
   exclusions:
