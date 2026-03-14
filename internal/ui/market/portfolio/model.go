@@ -123,7 +123,6 @@ func (m Model) DayChangePct() float64 { return m.dayChangePct }
 func (m *Model) recalculate() {
 	m.totalValue = 0
 	m.dayChange = 0
-	totalCost := 0.0
 
 	for i := range m.holdings {
 		h := &m.holdings[i]
@@ -140,7 +139,6 @@ func (m *Model) recalculate() {
 		}
 		m.totalValue += h.value
 		m.dayChange += qty * h.change
-		totalCost += qty * h.holding.AvgCostBasis
 	}
 
 	// Update allocation percentages
@@ -150,9 +148,12 @@ func (m *Model) recalculate() {
 		}
 	}
 
-	// Total day change percent
-	if totalCost > 0 {
-		m.dayChangePct = (m.dayChange / totalCost) * 100
+	// Total day change percent: divide by yesterday's value (current - dayChange)
+	prevValue := m.totalValue - m.dayChange
+	if prevValue > 0 {
+		m.dayChangePct = (m.dayChange / prevValue) * 100
+	} else {
+		m.dayChangePct = 0
 	}
 }
 

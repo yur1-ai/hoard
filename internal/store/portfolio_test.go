@@ -230,6 +230,44 @@ func TestSellWithNoHolding(t *testing.T) {
 	}
 }
 
+func TestSellEntirePosition(t *testing.T) {
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	acctID, _ := CreateAccount(db, "Main", "brokerage", "USD")
+
+	AddTransaction(db, Transaction{
+		AccountID: acctID, Symbol: "AAPL", Market: "us_equity",
+		Type: "buy", Quantity: 10, Price: 100.00, Date: time.Now(),
+	})
+
+	// Sell entire position
+	_, err = AddTransaction(db, Transaction{
+		AccountID: acctID, Symbol: "AAPL", Market: "us_equity",
+		Type: "sell", Quantity: 10, Price: 150.00, Date: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("sell all: %v", err)
+	}
+
+	// Holding row should be deleted, not left with qty=0
+	holdings, _ := ListHoldings(db, acctID)
+	if len(holdings) != 0 {
+		t.Errorf("expected 0 holdings after full sell, got %d (qty=%f)", len(holdings), holdings[0].Quantity)
+	}
+
+	// Verify the symbol no longer appears in equity symbols query
+	syms, _ := AllEquitySymbols(db)
+	for _, s := range syms {
+		if s == "AAPL" {
+			t.Error("AAPL should not appear in equity symbols after full sell")
+		}
+	}
+}
+
 func TestDeleteHolding(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {

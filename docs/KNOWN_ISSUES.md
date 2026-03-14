@@ -51,3 +51,17 @@ The outer bar background is built with `lipgloss.NewStyle()` inline, duplicating
 **File:** `internal/ui/header/header.go:64-72`
 
 Values 1,000–999,999 render as `12346` without thousands separators or decimals. Should display as `12,345.67` or similar for a finance app. Fix when header gets real portfolio data in Phase 4.
+
+## 6. market_cache PRIMARY KEY is symbol-only — cross-market collision risk
+
+**File:** `migrations/001_initial_schema.sql:45-46`
+
+The `market_cache` table has `symbol TEXT PRIMARY KEY`. Since `INSERT OR REPLACE` is keyed on symbol alone, if both equity and crypto use the same symbol (unlikely but possible), the cache entries overwrite each other. The `GetQuote`/`GetQuotes` queries also don't filter by market.
+
+**Fix:** Migration 002 should change PRIMARY KEY to `(symbol, market)`. Then add `AND market = ?` to `GetQuote`/`GetQuotes` in `store/cache.go` and pass market type from callers.
+
+## 7. Stale cache data returned without staleness indicator
+
+**File:** `internal/service/market/cache.go:98-101`
+
+When the provider fails, `CachedService.getQuotes` falls back to stale cache and returns it as a success (nil error). The user sees old prices with no visual indicator of staleness. Should surface a stale-data warning through the UI (e.g., "Last updated: 3h ago" or a stale badge).

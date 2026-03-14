@@ -1,6 +1,10 @@
 package app
 
-import "time"
+import (
+	"log/slog"
+	"time"
+	_ "time/tzdata" // Embed IANA timezone database for DST-correct market hours
+)
 
 var easternTZ *time.Location
 
@@ -8,6 +12,7 @@ func init() {
 	var err error
 	easternTZ, err = time.LoadLocation("America/New_York")
 	if err != nil {
+		slog.Warn("failed to load America/New_York timezone, DST will not be handled", "error", err)
 		easternTZ = time.FixedZone("EST", -5*60*60)
 	}
 }

@@ -238,6 +238,14 @@ func applySell(dbTx *sql.Tx, tx Transaction) error {
 	}
 
 	newQty := oldQty - tx.Quantity
+	if newQty <= 0 {
+		// Sold entire position — remove the holding row
+		_, err = dbTx.Exec("DELETE FROM holdings WHERE id = ?", holdingID)
+		if err != nil {
+			return fmt.Errorf("delete holding on full sell: %w", err)
+		}
+		return nil
+	}
 	_, err = dbTx.Exec("UPDATE holdings SET quantity = ? WHERE id = ?", newQty, holdingID)
 	if err != nil {
 		return fmt.Errorf("update holding on sell: %w", err)

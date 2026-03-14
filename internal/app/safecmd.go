@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -13,7 +14,7 @@ func safeCmd(fn func() tea.Msg) tea.Cmd {
 	return func() (result tea.Msg) {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("panic in command", "recover", r)
+				slog.Error("panic in command", "recover", r, "stack", string(debug.Stack()))
 				result = ErrMsg{
 					Err:     fmt.Errorf("internal error: %v", r),
 					Context: "panic",

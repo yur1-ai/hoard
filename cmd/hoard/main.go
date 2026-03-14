@@ -99,8 +99,14 @@ func run() error {
 	}
 
 	// Initialize market services
-	stockTTL, _ := time.ParseDuration(cfg.Market.RefreshIntervalMarket)
-	cryptoTTL, _ := time.ParseDuration(cfg.Market.RefreshIntervalCrypto)
+	stockTTL, err := time.ParseDuration(cfg.Market.RefreshIntervalMarket)
+	if err != nil {
+		return fmt.Errorf("parse stock refresh interval: %w", err)
+	}
+	cryptoTTL, err := time.ParseDuration(cfg.Market.RefreshIntervalCrypto)
+	if err != nil {
+		return fmt.Errorf("parse crypto refresh interval: %w", err)
+	}
 
 	var stockProvider svcmarket.StockProvider
 	if cfg.Market.Finnhub.APIKey != "" {

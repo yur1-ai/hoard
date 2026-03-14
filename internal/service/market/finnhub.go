@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 )
 
 const finnhubDefaultURL = "https://finnhub.io"
@@ -50,9 +52,9 @@ type finnhubSearchResult struct {
 }
 
 func (c *FinnhubClient) GetQuote(ctx context.Context, symbol string) (*Quote, error) {
-	url := fmt.Sprintf("%s/api/v1/quote?symbol=%s&token=%s", c.baseURL, symbol, c.apiKey)
+	u := fmt.Sprintf("%s/api/v1/quote?symbol=%s&token=%s", c.baseURL, url.QueryEscape(symbol), url.QueryEscape(c.apiKey))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("finnhub quote %s: %w", symbol, err)
 	}
@@ -93,21 +95,27 @@ func (c *FinnhubClient) GetQuotes(ctx context.Context, symbols []string) ([]Quot
 	}
 
 	var quotes []Quote
+	var lastErr error
 	for _, sym := range symbols {
 		q, err := c.GetQuote(ctx, sym)
 		if err != nil {
-			// Log but continue — don't fail the entire batch for one bad symbol
+			slog.Warn("failed to fetch quote", "symbol", sym, "error", err)
+			lastErr = err
 			continue
 		}
 		quotes = append(quotes, *q)
+	}
+	// If ALL symbols failed, return the error so callers know something is wrong
+	if len(quotes) == 0 && lastErr != nil {
+		return nil, fmt.Errorf("all %d symbol lookups failed, last: %w", len(symbols), lastErr)
 	}
 	return quotes, nil
 }
 
 func (c *FinnhubClient) SearchSymbol(ctx context.Context, query string) ([]SymbolMatch, error) {
-	url := fmt.Sprintf("%s/api/v1/search?q=%s&token=%s", c.baseURL, query, c.apiKey)
+	u := fmt.Sprintf("%s/api/v1/search?q=%s&token=%s", c.baseURL, url.QueryEscape(query), url.QueryEscape(c.apiKey))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("finnhub search: %w", err)
 	}

@@ -65,11 +65,18 @@ func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m App) handleTick() (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	cmds := m.buildFetchCmds()
 	cmds = append(cmds, m.scheduleTick())
+	return m, tea.Batch(cmds...)
+}
+
+// buildFetchCmds builds commands for any data sources needing refresh,
+// without scheduling a new tick timer.
+func (m *App) buildFetchCmds() []tea.Cmd {
+	var cmds []tea.Cmd
 
 	if m.marketSvc == nil || m.db == nil {
-		return m, tea.Batch(cmds...)
+		return cmds
 	}
 
 	// Equity refresh — adaptive interval based on market hours
@@ -140,7 +147,7 @@ func (m App) handleTick() (tea.Model, tea.Cmd) {
 		m.refresh.MarkRefreshed("currency")
 	}
 
-	return m, tea.Batch(cmds...)
+	return cmds
 }
 
 func (m App) updateHeaderFromPortfolio() App {
@@ -209,7 +216,10 @@ func (m App) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Refresh):
 		m.refresh.Reset("equity")
 		m.refresh.Reset("crypto")
-		return m.handleTick()
+		cmds := m.buildFetchCmds()
+		if len(cmds) > 0 {
+			return m, tea.Batch(cmds...)
+		}
 
 	default:
 		// Route to focused area for navigation keys (j/k/up/down)
@@ -238,7 +248,11 @@ func (m App) handleAddHolding(msg portfolio.AddHoldingMsg) (tea.Model, tea.Cmd) 
 
 	// Get default account (first available)
 	accounts, err := store.ListAccounts(m.db)
-	if err != nil || len(accounts) == 0 {
+	if err != nil {
+		m.lastErr = fmt.Sprintf("list accounts: %v", err)
+		return m, nil
+	}
+	if len(accounts) == 0 {
 		m.lastErr = "no account available"
 		return m, nil
 	}
@@ -285,10 +299,14 @@ func (m App) reloadHoldings() (tea.Model, tea.Cmd) {
 	m.portfolio.SetHoldings(holdings)
 	m = m.updateHeaderFromPortfolio()
 
-	// Trigger immediate refresh to fetch prices for any new symbols
+	// Trigger immediate refresh without spawning a duplicate tick timer
 	m.refresh.Reset("equity")
 	m.refresh.Reset("crypto")
-	return m.handleTick()
+	cmds := m.buildFetchCmds()
+	if len(cmds) > 0 {
+		return m, tea.Batch(cmds...)
+	}
+	return m, nil
 }
 
 func (m App) toggleSidebar() App {
