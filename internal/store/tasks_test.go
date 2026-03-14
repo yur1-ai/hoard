@@ -101,6 +101,30 @@ func TestDeleteTask(t *testing.T) {
 	}
 }
 
+func TestToggleNonExistentTask(t *testing.T) {
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	if err := ToggleTask(db, 9999); err == nil {
+		t.Error("expected error for non-existent task")
+	}
+}
+
+func TestDeleteNonExistentTask(t *testing.T) {
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	if err := DeleteTask(db, 9999); err == nil {
+		t.Error("expected error for non-existent task")
+	}
+}
+
 func TestTaskStats(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {

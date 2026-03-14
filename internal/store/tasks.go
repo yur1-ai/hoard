@@ -45,7 +45,7 @@ func ListTasks(db *sql.DB) ([]Task, error) {
 // ToggleTask flips a task between todo and done.
 // Setting to done records completed_at; setting back to todo clears it.
 func ToggleTask(db *sql.DB, id int64) error {
-	_, err := db.Exec(`
+	res, err := db.Exec(`
 		UPDATE tasks SET
 			status = CASE WHEN status = 'todo' THEN 'done' ELSE 'todo' END,
 			completed_at = CASE WHEN status = 'todo' THEN CURRENT_TIMESTAMP ELSE NULL END
@@ -54,13 +54,19 @@ func ToggleTask(db *sql.DB, id int64) error {
 	if err != nil {
 		return fmt.Errorf("toggle task: %w", err)
 	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("task %d not found", id)
+	}
 	return nil
 }
 
 func DeleteTask(db *sql.DB, id int64) error {
-	_, err := db.Exec("DELETE FROM tasks WHERE id = ?", id)
+	res, err := db.Exec("DELETE FROM tasks WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete task: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("task %d not found", id)
 	}
 	return nil
 }

@@ -153,9 +153,12 @@ func TestSetAndGetCurrencyRate(t *testing.T) {
 		t.Fatalf("set rate: %v", err)
 	}
 
-	rate, err := GetCurrencyRate(db, "USD", "EUR")
+	rate, found, err := GetCurrencyRate(db, "USD", "EUR")
 	if err != nil {
 		t.Fatalf("get rate: %v", err)
+	}
+	if !found {
+		t.Fatal("expected rate to be found")
 	}
 	if rate != 0.92 {
 		t.Errorf("expected 0.92, got %f", rate)
@@ -169,9 +172,12 @@ func TestGetCurrencyRateNotFound(t *testing.T) {
 	}
 	defer db.Close()
 
-	_, err = GetCurrencyRate(db, "USD", "JPY")
-	if err == nil {
-		t.Error("expected error for missing rate")
+	_, found, err := GetCurrencyRate(db, "USD", "JPY")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found {
+		t.Error("expected not found for missing rate")
 	}
 }
 
@@ -185,7 +191,7 @@ func TestSetCurrencyRateOverwrite(t *testing.T) {
 	SetCurrencyRate(db, "USD", "EUR", 0.90)
 	SetCurrencyRate(db, "USD", "EUR", 0.95)
 
-	rate, _ := GetCurrencyRate(db, "USD", "EUR")
+	rate, _, _ := GetCurrencyRate(db, "USD", "EUR")
 	if rate != 0.95 {
 		t.Errorf("expected updated rate 0.95, got %f", rate)
 	}

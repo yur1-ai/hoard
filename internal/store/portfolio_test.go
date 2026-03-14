@@ -313,6 +313,37 @@ func TestAllEquityAndCryptoSymbols(t *testing.T) {
 	}
 }
 
+func TestBuyNegativeQuantity(t *testing.T) {
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	acctID, _ := CreateAccount(db, "Main", "brokerage", "USD")
+
+	_, err = AddTransaction(db, Transaction{
+		AccountID: acctID, Symbol: "AAPL", Market: "us_equity",
+		Type: "buy", Quantity: -5, Price: 100, Date: time.Now(),
+	})
+	if err == nil {
+		t.Error("expected error for negative buy quantity")
+	}
+}
+
+func TestDeleteNonExistentHolding(t *testing.T) {
+	db, err := Open(":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	err = DeleteHolding(db, 9999)
+	if err == nil {
+		t.Error("expected error for non-existent holding")
+	}
+}
+
 func TestDividendTransaction(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {

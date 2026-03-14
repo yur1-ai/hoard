@@ -119,9 +119,12 @@ func UpdateHolding(db *sql.DB, h Holding) error {
 }
 
 func DeleteHolding(db *sql.DB, id int64) error {
-	_, err := db.Exec("DELETE FROM holdings WHERE id = ?", id)
+	res, err := db.Exec("DELETE FROM holdings WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("delete holding: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("holding %d not found", id)
 	}
 	return nil
 }
@@ -169,12 +172,16 @@ func AddTransaction(db *sql.DB, tx Transaction) (int64, error) {
 }
 
 func applyBuy(dbTx *sql.Tx, tx Transaction) error {
+	if tx.Quantity <= 0 {
+		return fmt.Errorf("buy quantity must be positive, got %f", tx.Quantity)
+	}
+
 	var holdingID int64
 	var oldQty, oldAvg float64
 
 	err := dbTx.QueryRow(
-		"SELECT id, quantity, avg_cost_basis FROM holdings WHERE account_id = ? AND symbol = ?",
-		tx.AccountID, tx.Symbol,
+		"SELECT id, quantity, avg_cost_basis FROM holdings WHERE account_id = ? AND symbol = ? AND market = ?",
+		tx.AccountID, tx.Symbol, tx.Market,
 	).Scan(&holdingID, &oldQty, &oldAvg)
 
 	if err == sql.ErrNoRows {
@@ -207,12 +214,16 @@ func applyBuy(dbTx *sql.Tx, tx Transaction) error {
 }
 
 func applySell(dbTx *sql.Tx, tx Transaction) error {
+	if tx.Quantity <= 0 {
+		return fmt.Errorf("sell quantity must be positive, got %f", tx.Quantity)
+	}
+
 	var holdingID int64
 	var oldQty float64
 
 	err := dbTx.QueryRow(
-		"SELECT id, quantity FROM holdings WHERE account_id = ? AND symbol = ?",
-		tx.AccountID, tx.Symbol,
+		"SELECT id, quantity FROM holdings WHERE account_id = ? AND symbol = ? AND market = ?",
+		tx.AccountID, tx.Symbol, tx.Market,
 	).Scan(&holdingID, &oldQty)
 
 	if err == sql.ErrNoRows {

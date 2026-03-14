@@ -126,14 +126,18 @@ func SetCurrencyRate(db *sql.DB, from, to string, rate float64) error {
 	return nil
 }
 
-func GetCurrencyRate(db *sql.DB, from, to string) (float64, error) {
+// GetCurrencyRate returns the cached exchange rate. Returns (0, nil) if not found.
+func GetCurrencyRate(db *sql.DB, from, to string) (float64, bool, error) {
 	var rate float64
 	err := db.QueryRow(
 		"SELECT rate FROM currency_rates WHERE from_currency = ? AND to_currency = ?",
 		from, to,
 	).Scan(&rate)
-	if err != nil {
-		return 0, fmt.Errorf("get currency rate %s→%s: %w", from, to, err)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
 	}
-	return rate, nil
+	if err != nil {
+		return 0, false, fmt.Errorf("get currency rate %s→%s: %w", from, to, err)
+	}
+	return rate, true, nil
 }
