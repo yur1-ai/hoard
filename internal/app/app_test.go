@@ -148,3 +148,75 @@ func TestSidebarDefaultClosed(t *testing.T) {
 		t.Error("expected sidebar closed by default")
 	}
 }
+
+func TestHelpToggle(t *testing.T) {
+	m := newTestApp()
+	if m.showHelp {
+		t.Fatal("help should be off initially")
+	}
+
+	m = pressKey(m, "?")
+	if !m.showHelp {
+		t.Error("expected help on after ?")
+	}
+
+	// While help is showing, view keys should be blocked
+	m = pressKey(m, "2")
+	if m.activeView != viewPortfolio {
+		t.Error("view should not change while help is open")
+	}
+
+	// ? again closes help
+	m = pressKey(m, "?")
+	if m.showHelp {
+		t.Error("expected help off after second ?")
+	}
+}
+
+func TestEscapeClosesHelp(t *testing.T) {
+	m := newTestApp()
+	m.showHelp = true
+
+	m = pressKey(m, "escape")
+	if m.showHelp {
+		t.Error("escape should close help")
+	}
+}
+
+func TestMinTerminalSize(t *testing.T) {
+	m := newTestApp()
+
+	// Simulate a small terminal
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	m = updated.(App)
+	if !m.tooSmall {
+		t.Error("expected tooSmall for 60x20")
+	}
+
+	// Simulate adequate terminal
+	updated, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = updated.(App)
+	if m.tooSmall {
+		t.Error("expected not tooSmall for 100x30")
+	}
+}
+
+func TestViewSwitchingBlockedInTextInput(t *testing.T) {
+	m := newTestApp()
+	m.mode = modeTextInput
+
+	m = pressKey(m, "2")
+	if m.activeView != viewPortfolio {
+		t.Error("view should not change in text input mode")
+	}
+}
+
+func TestQuitBlockedInTextInput(t *testing.T) {
+	m := newTestApp()
+	m.mode = modeTextInput
+
+	_, cmd := m.Update(tea.KeyPressMsg(tea.Key{Code: rune('q'), Text: "q"}))
+	if cmd != nil {
+		t.Error("q should not quit in text input mode")
+	}
+}

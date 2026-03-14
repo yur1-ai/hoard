@@ -2,10 +2,16 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/yur1-ai/hoard/internal/config"
+	"github.com/yur1-ai/hoard/internal/ui/common"
+	"github.com/yur1-ai/hoard/internal/ui/header"
+	"github.com/yur1-ai/hoard/internal/ui/market/charts"
+	"github.com/yur1-ai/hoard/internal/ui/market/news"
+	"github.com/yur1-ai/hoard/internal/ui/market/portfolio"
+	"github.com/yur1-ai/hoard/internal/ui/market/watchlist"
+	"github.com/yur1-ai/hoard/internal/ui/sidebar"
 )
 
 type inputMode int
@@ -32,10 +38,16 @@ const (
 	focusSidebar
 )
 
+const (
+	minWidth  = 80
+	minHeight = 24
+)
+
 // App is the root Bubble Tea model.
 type App struct {
 	cfg    config.Config
 	db     *sql.DB
+	keys   common.KeyMap
 	width  int
 	height int
 
@@ -43,7 +55,16 @@ type App struct {
 	activeView  activeView
 	focus       focusArea
 	sidebarOpen bool
+	showHelp    bool
+	tooSmall    bool
+	lastErr     string
 
+	headerData header.Data
+	sidebar    sidebar.Model
+	portfolio  portfolio.Model
+	watchlist  watchlist.Model
+	charts     charts.Model
+	news       news.Model
 }
 
 func New(cfg config.Config, db *sql.DB) App {
@@ -51,72 +72,19 @@ func New(cfg config.Config, db *sql.DB) App {
 	return App{
 		cfg:         cfg,
 		db:          db,
+		keys:        common.DefaultKeyMap(),
 		mode:        modeNormal,
 		activeView:  viewPortfolio,
 		focus:       focusMarket,
 		sidebarOpen: sidebarOpen,
+		sidebar:     sidebar.New(),
+		portfolio:   portfolio.New(),
+		watchlist:   watchlist.New(),
+		charts:      charts.New(),
+		news:        news.New(),
 	}
 }
 
 func (m App) Init() tea.Cmd {
 	return nil
-}
-
-func (m App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		return m, nil
-
-	case tea.KeyPressMsg:
-		if msg.Code == tea.KeyEscape {
-			m.mode = modeNormal
-			return m, nil
-		}
-		if m.mode == modeNormal {
-			switch msg.String() {
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			case "1":
-				m.activeView = viewPortfolio
-			case "2":
-				m.activeView = viewWatchlist
-			case "3":
-				m.activeView = viewCharts
-			case "4":
-				m.activeView = viewNews
-			case "tab":
-				// Three-state sidebar toggle (v3 fix)
-				switch {
-				case !m.sidebarOpen:
-					m.sidebarOpen = true
-					m.focus = focusSidebar
-				case m.focus == focusMarket:
-					m.focus = focusSidebar
-				default:
-					m.sidebarOpen = false
-					m.focus = focusMarket
-				}
-			}
-		}
-		return m, nil
-	}
-	return m, nil
-}
-
-func (m App) View() tea.View {
-	viewNames := [4]string{"Portfolio", "Watchlist", "Charts", "News"}
-	content := fmt.Sprintf("HOARD  %s", viewNames[m.activeView])
-	content += "\n\nPress [1-4] to switch views, [Tab] to toggle sidebar, [q] to quit"
-
-	if m.sidebarOpen {
-		focusLabel := "market"
-		if m.focus == focusSidebar {
-			focusLabel = "sidebar"
-		}
-		content += fmt.Sprintf("\n\n[Sidebar: open, focus: %s]", focusLabel)
-	}
-
-	return tea.View{Content: content, AltScreen: true}
 }
